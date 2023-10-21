@@ -1,0 +1,152 @@
+EXTRAÇÃO
+
+import pandas as pd
+
+df = pd.read_csv('Pipeline_ETL.csv')
+user_ids = df['UserID'].tolist()
+print(user_ids)
+
+[5655, 5656, 5657]
+
+import requests
+import json
+
+def get_user(id):
+  response = requests.get(f'{sdw2023_api_url}/users/{id}')
+  return response.json() if response.status_code == 200 else None
+
+users = [user for id in user_ids if (user := get_user(id)) is not None]
+print(json.dumps(users, indent=2))
+
+[
+  {
+    "id": 5655,
+    "name": "Calebson",
+    "account": {
+      "id": 5992,
+      "number": "1563-2",
+      "agency": "0001",
+      "balance": 0.0,
+      "limit": 500.0
+    },
+    "card": {
+      "id": 5495,
+      "number": "**** **** **** 7208",
+      "limit": 1000.0
+    },
+    "features": [],
+    "news": []
+  },
+  {
+    "id": 5656,
+    "name": "Joaquinildo",
+    "account": {
+      "id": 5993,
+      "number": "1568-3",
+      "agency": "0001",
+      "balance": 0.0,
+      "limit": 500.0
+    },
+    "card": {
+      "id": 5496,
+      "number": "**** **** **** 7305",
+      "limit": 1000.0
+    },
+    "features": [],
+    "news": []
+  },
+  {
+    "id": 5657,
+    "name": "heitornildo",
+    "account": {
+      "id": 5994,
+      "number": "1679-8",
+      "agency": "0001",
+      "balance": 0.0,
+      "limit": 500.0
+    },
+    "card": {
+      "id": 5497,
+      "number": "**** **** **** 8543",
+      "limit": 1000.0
+    },
+    "features": [],
+    "news": []
+  }
+]
+
+TRANSFORMAÇÃO
+
+!pip install openai
+
+Collecting openai
+  Downloading openai-0.28.1-py3-none-any.whl (76 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 77.0/77.0 kB 1.9 MB/s eta 0:00:00
+Requirement already satisfied: requests>=2.20 in /usr/local/lib/python3.10/dist-packages (from openai) (2.31.0)
+Requirement already satisfied: tqdm in /usr/local/lib/python3.10/dist-packages (from openai) (4.66.1)
+Requirement already satisfied: aiohttp in /usr/local/lib/python3.10/dist-packages (from openai) (3.8.6)
+Requirement already satisfied: charset-normalizer<4,>=2 in /usr/local/lib/python3.10/dist-packages (from requests>=2.20->openai) (3.3.0)
+Requirement already satisfied: idna<4,>=2.5 in /usr/local/lib/python3.10/dist-packages (from requests>=2.20->openai) (3.4)
+Requirement already satisfied: urllib3<3,>=1.21.1 in /usr/local/lib/python3.10/dist-packages (from requests>=2.20->openai) (2.0.7)
+Requirement already satisfied: certifi>=2017.4.17 in /usr/local/lib/python3.10/dist-packages (from requests>=2.20->openai) (2023.7.22)
+Requirement already satisfied: attrs>=17.3.0 in /usr/local/lib/python3.10/dist-packages (from aiohttp->openai) (23.1.0)
+Requirement already satisfied: multidict<7.0,>=4.5 in /usr/local/lib/python3.10/dist-packages (from aiohttp->openai) (6.0.4)
+Requirement already satisfied: async-timeout<5.0,>=4.0.0a3 in /usr/local/lib/python3.10/dist-packages (from aiohttp->openai) (4.0.3)
+Requirement already satisfied: yarl<2.0,>=1.0 in /usr/local/lib/python3.10/dist-packages (from aiohttp->openai) (1.9.2)
+Requirement already satisfied: frozenlist>=1.1.1 in /usr/local/lib/python3.10/dist-packages (from aiohttp->openai) (1.4.0)
+Requirement already satisfied: aiosignal>=1.1.2 in /usr/local/lib/python3.10/dist-packages (from aiohttp->openai) (1.3.1)
+Installing collected packages: openai
+ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+llmx 0.0.15a0 requires cohere, which is not installed.
+llmx 0.0.15a0 requires tiktoken, which is not installed.
+Successfully installed openai-0.28.1
+
+
+openai_api_key = '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'
+
+import openai
+
+openai.api_key = openai_api_key
+
+def generate_ai_news(user):
+  completion = openai.ChatCompletion.create(
+    model="gpt-4",
+    messages=[
+      {
+          "role": "system",
+          "content": "Você é um especialista em markting bancário."
+      },
+      {
+          "role": "user",
+          "content": f"Crie uma mensagem para {user['name']} sobre a importância dos investimentos (máximo de 100 caracteres)"
+      }
+    ]
+  )
+  return completion.choices[0].message.content.strip('\"')
+
+for user in users:
+  news = generate_ai_news(user)
+  print(news)
+  user['news'].append({
+      "icon": "https://digitalinnovationone.github.io/santander-dev-week-2023-api/icons/credit.svg",
+      "description": news
+  })
+
+
+Calebson, investir é dar passos firmes para uma segurança financeira futura. Comece agora!
+Joaquinildo, investir é garantir seu futuro. Comece agora e veja seu dinheiro se multiplicar!
+Heitornildo, investir é crucial para construir um futuro seguro. Expanda suas possibilidades financeiras!
+
+CARREGAMENTO
+
+def update_user(user):
+  response = requests.put(f"{sdw2023_api_url}/users/{user['id']}", json=user)
+  return True if response.status_code == 200 else False
+
+for user in users:
+  success = update_user(user)
+  print(f"User {user['name']} updated? {success}!")
+
+User Calebson updated? True!
+User Joaquinildo updated? True!
+User heitornildo updated? True!
